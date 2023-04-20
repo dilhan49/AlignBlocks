@@ -94,50 +94,6 @@ class AlignBlocks {
   //   }
   // }
 
-  setTune(id_bloc, id_ligne) {
-    let imgSrc,
-      imgWidth,
-      imgStyle = "";
-    for (let elementSecond of document.getElementById(`${id_ligne}`)
-      .childNodes) {
-      for (let element of elementSecond.childNodes) {
-        if (document.getElementById(element.id).childNodes[0] != undefined) {
-          if (
-            document.getElementById(element.id).childNodes[0].tagName == "IMG"
-          ) {
-            imgSrc = document.getElementById(element.id).childNodes[0].src;
-            imgWidth = document.getElementById(element.id).childNodes[0].width;
-            imgStyle = document.getElementById(element.id).childNodes[0].style;
-          } else {
-            imgSrc = "";
-            imgWidth = "";
-            imgStyle = "";
-          }
-        } else {
-          imgSrc = "";
-          imgWidth = "";
-          imgStyle = "";
-        }
-
-        this._data[element.id] = {
-          Data: {
-            BlocId: element.id,
-            Texte: element.innerText,
-            BlocStyle: element.style,
-          },
-          Img:
-            imgSrc != undefined
-              ? {
-                  ImgSrc: imgSrc,
-                  ImgWidth: `${imgWidth}`,
-                  ImgStyle: imgStyle,
-                }
-              : { ImgSrc: "", ImgWidth: "", ImgStyle: "" },
-        };
-      }
-    }
-  }
-
   _createImage(url, id_bloc) {
     //Taille du wrapper inférieur à 4 et on insère une url
     const blockId = this.api.blocks.getCurrentBlockIndex();
@@ -192,10 +148,49 @@ class AlignBlocks {
    * @returns
    */
 
-  save() {
-    const blockId = this.api.blocks.getCurrentBlockIndex();
-    this.setTune("r", `ligne${blockId}`);
-    return this._data;
+  save(blockContent) {
+    let imgSrc,
+      imgWidth,
+      imgStyle = "";
+    let listBlock = [];
+    for (let elementSecond of blockContent.childNodes) {
+      for (let element of elementSecond.childNodes) {
+        if (document.getElementById(element.id).childNodes[0] != undefined) {
+          document.getElementById(element.id).childNodes.forEach((toto) => {
+            if (toto.tagName == "IMG") {
+              imgSrc = toto.src;
+              imgWidth = toto.width;
+              imgStyle = toto.style;
+            } else {
+              imgSrc = "";
+              imgWidth = "";
+              imgStyle = "";
+            }
+          });
+        } else {
+          imgSrc = "";
+          imgWidth = "";
+          imgStyle = "";
+        }
+
+        listBlock.push({
+          Data: {
+            BlocId: element.id,
+            Texte: element.innerText,
+            BlocStyle: element.style,
+          },
+          Img:
+            imgSrc != undefined
+              ? {
+                  ImgSrc: imgSrc,
+                  ImgWidth: `${imgWidth}`,
+                  ImgStyle: imgStyle,
+                }
+              : { ImgSrc: "", ImgWidth: "", ImgStyle: "" },
+        });
+      }
+    }
+    return listBlock;
   }
   renderSettings() {
     const settings = [
