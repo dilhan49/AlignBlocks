@@ -2,11 +2,11 @@
 require("./index.css").toString();
 
 /**
- * Outil pour créer un bloc de type iframe PDF
+ * Outil pour créer un bloc d'alignement permettant de comporter jusqu'à 5 blocs
  */
 class AlignBlocks {
   /**
-   * Bouton pour ajouter un bloc "Pdf"
+   * Bouton pour ajouter un bloc "AlignBlock"
    */
   static get toolbox() {
     return {
@@ -16,7 +16,7 @@ class AlignBlocks {
   }
 
   constructor({ data, api }) {
-    this.api = api;
+    this.api = api; //API editorJS; permet l'utilisation des fonctions de editorjs
     this._data = {};
     this.data = data;
   }
@@ -25,9 +25,7 @@ class AlignBlocks {
     return this._data;
   }
 
-  set data(data) {
-    //Faire en sorte d'actualiser la data
-  }
+  set data(data) {}
 
   /**
    * Rendu dans l'éditeur lorsqu'on ajoute ce type de bloc
@@ -39,17 +37,111 @@ class AlignBlocks {
     this.wrapper = document.createElement("div");
     this.wrapper.classList.value = "row";
     this.wrapper.id = "ligne" + blockId;
+    // On instancie notre bloc alignblocks à laquelle on ajout une div.row
+    //Lorsqu'on ajout un bloc (max.4), il s'agit d'un ajout d'une div.col à la div.row créé plus haut
+
     //Création du premier bloc
     let col1 = document.createElement("div");
     col1.classList.value = "col";
     let bloc1 = document.createElement("div");
-    bloc1.id = `_bloc1_ligne${blockId}`;
+    bloc1.id = `_bloc1_ligne${blockId}`; //id du bloc
     bloc1.style = "border: solid grey 0.10rem;";
-    bloc1.classList.value = "ce-paragraph cdx-block";
-    bloc1.contentEditable = "true";
+    bloc1.classList.value = "ce-paragraph cdx-block container"; // norme des blocs editorjs
+    bloc1.contentEditable = "true"; //Bloc editable
     bloc1.addEventListener("paste", (event) => {
-      this._createImage(event, bloc1.id);
+      this._createImage(event, bloc1.id); //Lorsqu'on colle un objet dans le bloc, on traite cet objet dans la méthode _createImage
     });
+
+    //sélecteur de fichier pour charger image
+    //On ajout un sélecteur de fichier de type input pour pouvoir charger des images dans le bloc directement depuis un explorateur de fichiers
+    let selFile = document.createElement("input");
+    selFile.type = "file";
+    selFile.id = `_selFile_bloc1_ligne${blockId}`;
+    selFile.accept = "image/png, image/jpeg";
+    selFile.display = "none";
+    selFile.addEventListener("change", () => {
+      let fichier = selFile.files[0];
+      let name =
+        selFile.files[0].name != undefined
+          ? selFile.files[0].name
+          : "image.png";
+      let reader = new FileReader();
+      reader.addEventListener("load", function () {
+        let donnees = reader.result; // conversion du fichier en base64
+        data = { image: donnees.split("base64,")[1], name: name };
+        //Enregistrement du fichier dans le dossier des images notices
+        ajaxPost(
+          "/documentation/cilt_edit/noticeEditorUploadImageByFile",
+          data,
+          (reponse) => {
+            rep = JSON.parse(reponse);
+            console.log(rep);
+            selFile.remove(); //on supprime le sélecteur de fichier après utilisation
+            iconeInputFile.remove(); // idem (iconeInputFile est une icone remplaçant visuellement l'input de type file)
+            const image = document.createElement("img");
+            image.src = rep.file.url; //on remplace la source de l'image créé par le chemin d'accès de l'image ajouté dans le dossier des images notices
+            //Création d'un bouton superposé sur l'image qui permet d'augmenter la taille de l'image
+            let btnIncrease = document.createElement("img");
+            btnIncrease.classList.value = "btn";
+            btnIncrease.src =
+              "https://slslt00254.sidom.sidel.com/static/editorjs-tools/alignblocks/src/assets/25390.png";
+            //on cache le bouton par défaut
+            btnIncrease.hidden = true;
+            btnIncrease.addEventListener(
+              "click",
+              () => {
+                image.width = image.width * 1.1;
+              },
+              false
+            );
+            //lorsque la souris est dessus le bloc, on affiche le bouton créé plus tôt ce qui nous permet de cliquer dessus afin d'augmenter sa taille
+            bloc1.addEventListener("mouseover", () => {
+              btnIncrease.hidden = false;
+            });
+            //lorsque la souris n'est pas dessus le bloc, on masque le bouton et ses fonctionnalités
+            bloc1.addEventListener("mouseout", () => {
+              btnIncrease.hidden = true;
+            });
+
+            //Idem que btnIncrease mais qui sert ici à réduire la taille de l'image
+            let btnReduce = document.createElement("img");
+            btnReduce.classList.value = "btn";
+            btnReduce.src =
+              "https://slslt00254.sidom.sidel.com/static/editorjs-tools/alignblocks/src/assets/25387.png";
+            btnReduce.style = "left: 35%;";
+            btnReduce.hidden = true;
+            btnReduce.addEventListener(
+              "click",
+              () => {
+                image.width = image.width * 0.9;
+              },
+              false
+            );
+            bloc1.addEventListener("mouseover", () => {
+              btnReduce.hidden = false;
+            });
+            bloc1.addEventListener("mouseout", () => {
+              btnReduce.hidden = true;
+            });
+
+            bloc1.appendChild(image);
+            bloc1.appendChild(btnIncrease);
+            bloc1.appendChild(btnReduce);
+          }
+        );
+      });
+      reader.readAsDataURL(fichier);
+    });
+    //Création d'un petit icone explicite pour remplacer visuellement l'input de type file
+    let iconeInputFile = document.createElement("img");
+    iconeInputFile.src =
+      "https://slslt00254.sidom.sidel.com/static/editorjs-tools/alignblocks/src/assets/pictureButton.png";
+    iconeInputFile.addEventListener("click", function () {
+      selFile.click();
+    });
+    iconeInputFile.id = `_icon_selFile_${bloc1.id}`;
+    bloc1.appendChild(iconeInputFile);
+    //on a ajouté le selecteur de fichier
     col1.appendChild(bloc1);
     $(`#_bloc1_ligne${blockId}`).attr("data-placeholder");
 
@@ -57,42 +149,6 @@ class AlignBlocks {
 
     return this.wrapper;
   }
-
-  // setTune(id_bloc, id_ligne) {
-  //   let imgSrc,
-  //     imgWidth,
-  //     imgStyle = "";
-  //   if (id_ligne != "") {
-  //     if (document.getElementById(id_ligne).childNodes != undefined) {
-  //       for (let elementFirst of document.getElementById(id_ligne).childNodes) {
-  //         for (let element of elementFirst.childNodes) {
-  //           if (element.tagName == "IMG") {
-  //             imgSrc = element.src;
-  //             imgWidth = element.width;
-  //             imgStyle = element.style;
-  //           }
-  //           if (element.id != "") {
-  //             this._data[element.id] = {
-  //               Data: {
-  //                 BlocId: element.id,
-  //                 Texte: element.innerText,
-  //                 BlocStyle: element.style,
-  //               },
-  //               Img:
-  //                 imgSrc != undefined
-  //                   ? {
-  //                       ImgSrc: imgSrc,
-  //                       ImgWidth: `${imgWidth}`,
-  //                       ImgStyle: imgStyle,
-  //                     }
-  //                   : { ImgSrc: "", ImgWidth: "", ImgStyle: "" },
-  //             };
-  //           }
-  //         }
-  //       }
-  //     }
-  //   }
-  // }
 
   _createImage(url, id_bloc) {
     //Taille du wrapper inférieur à 4 et on insère une url
@@ -108,11 +164,93 @@ class AlignBlocks {
         let bloc = document.createElement("div");
         bloc.id = `_bloc${idNext}_ligne${blockId}`;
         bloc.style = "border: solid grey 0.10rem;";
-        bloc.classList.value = "ce-paragraph cdx-block";
+        bloc.classList.value = "ce-paragraph cdx-block container";
         bloc.contentEditable = "true";
         bloc.addEventListener("paste", (event) => {
           this._createImage(event, bloc.id);
         });
+
+        //sélecteur de fichier pour charger image
+        let selFile = document.createElement("input");
+        selFile.type = "file";
+        selFile.id = `_selFile_${bloc.id}`;
+        selFile.accept = "image/png, image/jpeg";
+        selFile.display = "none";
+        selFile.addEventListener("change", () => {
+          let fichier = selFile.files[0];
+          let name =
+            selFile.files[0].name != undefined
+              ? selFile.files[0].name
+              : "image.png";
+          let reader = new FileReader();
+          reader.addEventListener("load", function () {
+            let donnees = reader.result;
+            data = { image: donnees.split("base64,")[1], name: name };
+            ajaxPost(
+              "/documentation/cilt_edit/noticeEditorUploadImageByFile",
+              data,
+              (reponse) => {
+                rep = JSON.parse(reponse);
+                console.log(rep);
+                selFile.remove();
+                iconeInputFile.remove();
+                const image = document.createElement("img");
+                image.src = rep.file.url;
+                let btnIncrease = document.createElement("img");
+                btnIncrease.classList.value = "btn";
+                btnIncrease.src =
+                  "https://slslt00254.sidom.sidel.com/static/editorjs-tools/alignblocks/src/assets/25390.png";
+                btnIncrease.hidden = true;
+                btnIncrease.addEventListener(
+                  "click",
+                  () => {
+                    image.width = image.width * 1.1;
+                  },
+                  false
+                );
+                bloc.addEventListener("mouseover", () => {
+                  btnIncrease.hidden = false;
+                });
+                bloc.addEventListener("mouseout", () => {
+                  btnIncrease.hidden = true;
+                });
+
+                let btnReduce = document.createElement("img");
+                btnReduce.classList.value = "btn";
+                btnReduce.src =
+                  "https://slslt00254.sidom.sidel.com/static/editorjs-tools/alignblocks/src/assets/25387.png";
+                btnReduce.style = "left: 35%;";
+                btnReduce.hidden = true;
+                btnReduce.addEventListener(
+                  "click",
+                  () => {
+                    image.width = image.width * 0.9;
+                  },
+                  false
+                );
+                bloc.addEventListener("mouseover", () => {
+                  btnReduce.hidden = false;
+                });
+                bloc.addEventListener("mouseout", () => {
+                  btnReduce.hidden = true;
+                });
+                bloc.appendChild(image);
+                bloc.appendChild(btnIncrease);
+                bloc.appendChild(btnReduce);
+              }
+            );
+          });
+          reader.readAsDataURL(fichier);
+        });
+        let iconeInputFile = document.createElement("img");
+        iconeInputFile.src =
+          "https://slslt00254.sidom.sidel.com/static/editorjs-tools/alignblocks/src/assets/pictureButton.png";
+        iconeInputFile.addEventListener("click", function () {
+          selFile.click();
+        });
+        iconeInputFile.id = `_icon_selFile_${bloc.id}`;
+        bloc.appendChild(iconeInputFile);
+
         col.appendChild(bloc);
         $(`#_bloc${idNext}_ligne${blockId}`).attr("data-placeholder");
         document.getElementById(`ligne${blockId}`).appendChild(col);
@@ -121,10 +259,58 @@ class AlignBlocks {
 
       const image = document.createElement("img");
       image.src = url.clipboardData.getData("text");
-      image.style = "max-width: 75%;";
       let urlCurrentTarget = url.currentTarget;
-      urlCurrentTarget.appendChild(image);
+      let btnIncrease = document.createElement("img");
+      btnIncrease.classList.value = "btn";
+      btnIncrease.src =
+        "https://slslt00254.sidom.sidel.com/static/editorjs-tools/alignblocks/src/assets/25390.png";
+      btnIncrease.hidden = true;
+      btnIncrease.addEventListener(
+        "click",
+        () => {
+          image.width = image.width * 1.1;
+        },
+        false
+      );
+      urlCurrentTarget.addEventListener("mouseover", () => {
+        btnIncrease.hidden = false;
+      });
+      urlCurrentTarget.addEventListener("mouseout", () => {
+        btnIncrease.hidden = true;
+      });
 
+      let btnReduce = document.createElement("img");
+      btnReduce.classList.value = "btn";
+      btnReduce.src =
+        "https://slslt00254.sidom.sidel.com/static/editorjs-tools/alignblocks/src/assets/25387.png";
+      btnReduce.style = "left: 35%;";
+      btnReduce.hidden = true;
+      btnReduce.addEventListener(
+        "click",
+        () => {
+          image.width = image.width * 0.9;
+        },
+        false
+      );
+      urlCurrentTarget.addEventListener("mouseover", () => {
+        btnReduce.hidden = false;
+      });
+      urlCurrentTarget.addEventListener("mouseout", () => {
+        btnReduce.hidden = true;
+      });
+      urlCurrentTarget.appendChild(btnReduce);
+      urlCurrentTarget.appendChild(btnIncrease);
+
+      urlCurrentTarget.appendChild(image);
+      for (let element of urlCurrentTarget.childNodes) {
+        if (
+          element.tagName == "IMG" &&
+          element.src ==
+            "https://slslt00254.sidom.sidel.com/static/editorjs-tools/alignblocks/src/assets/pictureButton.png"
+        ) {
+          element.remove();
+        }
+      }
       let base64 = "";
       toDataUrl(image.src, function (myBase64) {
         base64 = myBase64; // myBase64 is the base64 string
@@ -139,11 +325,92 @@ class AlignBlocks {
           }
         );
       });
+    } else if (url.clipboardData.files.length > 0) {
+      //Lorsqu'on colle une image
+      let fichier = url.clipboardData.files[0];
+      let name = url.clipboardData.files[0].name;
+      let reader = new FileReader();
+      let idNext =
+        document.getElementById(`ligne${blockId}`).childNodes.length + 1;
+      let col = document.createElement("div");
+      col.classList.value = "col";
+
+      const image = document.createElement("img");
+      image.src = "";
+      let urlCurrentTarget = url.currentTarget;
+      for (let element of urlCurrentTarget.childNodes) {
+        if (
+          element.tagName == "IMG" &&
+          element.src ==
+            "https://slslt00254.sidom.sidel.com/static/editorjs-tools/alignblocks/src/assets/pictureButton.png"
+        ) {
+          element.remove();
+        }
+      }
+      reader.addEventListener("load", function () {
+        var donnees = reader.result;
+        data = {
+          image: donnees.split("base64,")[1],
+          name: name,
+        };
+        ajaxPost(
+          "/documentation/cilt_edit/noticeEditorUploadImageByFile",
+          data,
+          function (reponse) {
+            rep = JSON.parse(reponse);
+            console.log(rep);
+            const image = document.createElement("img");
+            image.src = rep.file.url;
+            let btnIncrease = document.createElement("img");
+            btnIncrease.classList.value = "btn";
+            btnIncrease.src =
+              "https://slslt00254.sidom.sidel.com/static/editorjs-tools/alignblocks/src/assets/25390.png";
+            btnIncrease.hidden = true;
+            btnIncrease.addEventListener(
+              "click",
+              () => {
+                image.width = image.width * 1.1;
+              },
+              false
+            );
+            urlCurrentTarget.addEventListener("mouseover", () => {
+              btnIncrease.hidden = false;
+            });
+            urlCurrentTarget.addEventListener("mouseout", () => {
+              btnIncrease.hidden = true;
+            });
+
+            let btnReduce = document.createElement("img");
+            btnReduce.classList.value = "btn";
+            btnReduce.src =
+              "https://slslt00254.sidom.sidel.com/static/editorjs-tools/alignblocks/src/assets/25387.png";
+            btnReduce.style = "left: 35%;";
+            btnReduce.hidden = true;
+            btnReduce.addEventListener(
+              "click",
+              () => {
+                image.width = image.width * 0.9;
+              },
+              false
+            );
+            urlCurrentTarget.addEventListener("mouseover", () => {
+              btnReduce.hidden = false;
+            });
+            urlCurrentTarget.addEventListener("mouseout", () => {
+              btnReduce.hidden = true;
+            });
+            urlCurrentTarget.appendChild(image);
+            urlCurrentTarget.appendChild(btnIncrease);
+            urlCurrentTarget.appendChild(btnReduce);
+          }
+        );
+      });
+      reader.readAsDataURL(fichier);
     }
   }
 
   /**
-   * Fonction pour mettre en forme les données lors de la sauvegarde des blocs
+   * Méthode pour mettre en forme les données lors de la sauvegarde des blocs
    * @param {HTMLElement} blockContent
    * @returns
    */
@@ -153,15 +420,40 @@ class AlignBlocks {
       imgWidth,
       imgStyle = "";
     let listBlock = [];
+    let textBlock = "";
     for (let elementSecond of blockContent.childNodes) {
+      textBlock = "";
       for (let element of elementSecond.childNodes) {
+        textBlock = element.innerHTML
+          .replace("Augmenter la taille de l'image", "")
+          .replace("Diminuer la taille de l'image", "");
         if (document.getElementById(element.id).childNodes[0] != undefined) {
           document.getElementById(element.id).childNodes.forEach((toto) => {
-            if (toto.tagName == "IMG") {
-              imgSrc = toto.src;
+            if (
+              toto.tagName == "IMG" &&
+              toto.src !=
+                "https://slslt00254.sidom.sidel.com/static/editorjs-tools/alignblocks/src/assets/pictureButton.png" &&
+              toto.src !=
+                "https://slslt00254.sidom.sidel.com/static/editorjs-tools/alignblocks/src/assets/25390.png" &&
+              toto.src !=
+                "https://slslt00254.sidom.sidel.com/static/editorjs-tools/alignblocks/src/assets/25387.png"
+            ) {
+              if (toto.src.includes("EditorJSImageTemporaire")) {
+                imgSrc = toto.src.replace(
+                  "EditorJSImageTemporaire",
+                  "EditorJSImageFinal"
+                );
+              } else {
+                imgSrc = toto.src;
+              }
+
               imgWidth = toto.width;
               imgStyle = toto.style;
-            } else {
+              textBlock = textBlock.replace(`${toto.outerHTML}`, "");
+            } else if (
+              toto.src ==
+              "https://slslt00254.sidom.sidel.com/static/editorjs-tools/alignblocks/src/assets/pictureButton.png"
+            ) {
               imgSrc = "";
               imgWidth = "";
               imgStyle = "";
@@ -176,8 +468,10 @@ class AlignBlocks {
         listBlock.push({
           Data: {
             BlocId: element.id,
-            Texte: element.innerText,
+            TexteHTML: textBlock,
             BlocStyle: element.style,
+            AjustementAuto:
+              element.parentNode.classList == "col" ? false : true,
           },
           Img:
             imgSrc != undefined
@@ -200,9 +494,29 @@ class AlignBlocks {
         title: "Ajouter un nouveau bloc",
       },
       {
+        name: "deleteBlock",
+        icon: require("./assets/backspace-svgrepo-com.svg").default,
+        title: "Supprimer le dernier bloc",
+      },
+      {
         name: "seeGrid",
         icon: require("./assets/view-grid-svgrepo-com.svg").default,
         title: "Afficher/Masquer les grilles",
+      },
+      {
+        name: "increasePicturesSize",
+        icon: require("./assets/expand-svgrepo-com.svg").default,
+        title: "Augmenter la taille des images",
+      },
+      {
+        name: "reducePicturesSize",
+        icon: require("./assets/reduce-svgrepo-com.svg").default,
+        title: "Diminuer la taille des images",
+      },
+      {
+        name: "colAuto",
+        icon: require("./assets/adjustment.svg").default,
+        title: "Ajustement automatique",
       },
     ];
     const blockId = this.api.blocks.getCurrentBlockIndex();
@@ -211,9 +525,17 @@ class AlignBlocks {
     settings.forEach((tune) => {
       let button = document.createElement("div");
       button.id = `_tune_${tune.name}`;
+      button.title = tune.title;
+      //on ajout un id au bouton seeGrid pour gérer si on doit passer le bouton en actif ou non
       if (tune.name === "seeGrid") {
         document.getElementById(`ligne${blockId}`).childNodes[0].childNodes[0]
           .style.border == "0.1rem solid grey"
+          ? (button.classList.value =
+              "cdx-settings-button cdx-settings-button--active")
+          : (button.classList.value = "cdx-settings-button");
+      } else if (tune.name === "colAuto") {
+        document.getElementById(`ligne${blockId}`).childNodes[0].classList ==
+        "col-auto"
           ? (button.classList.value =
               "cdx-settings-button cdx-settings-button--active")
           : (button.classList.value = "cdx-settings-button");
@@ -227,11 +549,46 @@ class AlignBlocks {
       if (tune.name == "addBlock") {
         button.addEventListener("click", () => {
           this._toggleTune(tune.name);
-          //La ligne suivante va passer le bouton cliquer en actif
-          // button.classList.toggle("cdx-settings-button--active");
-
-          //Ajout de la fonction permettant d'ajouter un nouveau bloc
+          //Ajout de la Méthode permettant d'ajouter un nouveau bloc
           this._addBlock(`ligne${blockId}`);
+        });
+      }
+      if (tune.name == "deleteBlock") {
+        button.addEventListener("click", () => {
+          this._toggleTune(tune.name);
+          //Ajout de la Méthode permettant d'ajouter un nouveau bloc
+          this._deleteBlock(`ligne${blockId}`);
+        });
+      }
+      if (tune.name == "increasePicturesSize") {
+        button.addEventListener("click", () => {
+          this._toggleTune(tune.name);
+          //Ajout de la Méthode permettant d'ajouter un nouveau bloc
+          this._increasePicturesSize(`ligne${blockId}`);
+        });
+      }
+      if (tune.name == "reducePicturesSize") {
+        button.addEventListener("click", () => {
+          this._toggleTune(tune.name);
+          //Ajout de la Méthode permettant d'ajouter un nouveau bloc
+          this._reducePicturesSize(`ligne${blockId}`);
+        });
+      }
+      if (tune.name == "colAuto") {
+        button.addEventListener("click", () => {
+          this._toggleTune(tune.name);
+          //Ajout de la Méthode permettant d'ajouter un nouveau bloc
+          this._colAuto(`ligne${blockId}`);
+          //La ligne suivante va passer le bouton cliquer en actif
+          if (
+            document.getElementById(`ligne${blockId}`).childNodes[0]
+              .classList == "col-auto"
+          ) {
+            button.classList.value =
+              "cdx-settings-button cdx-settings-button--active";
+          } else {
+            button.classList.value = "cdx-settings-button";
+          }
         });
       }
       if (tune.name == "seeGrid") {
@@ -248,13 +605,51 @@ class AlignBlocks {
           } else {
             button.classList.value = "cdx-settings-button";
           }
-
-          //Ajout de la fonction permettant d'ajouter un nouveau bloc
         });
       }
     });
 
     return wrapper;
+  }
+  _reducePicturesSize(id_ligne) {
+    for (let elementFirst of document.getElementById(id_ligne).childNodes) {
+      for (let element of elementFirst.childNodes) {
+        for (let i = 0; i < element.childNodes.length; i++) {
+          if (
+            element.childNodes[i].tagName == "IMG" &&
+            element.childNodes[i].src !=
+              "https://slslt00254.sidom.sidel.com/static/editorjs-tools/alignblocks/src/assets/pictureButton.png" && // Il s'agit de la source de l'icone
+            element.childNodes[i].src !=
+              "https://slslt00254.sidom.sidel.com/static/editorjs-tools/alignblocks/src/assets/25390.png" &&
+            element.childNodes[i].src !=
+              "https://slslt00254.sidom.sidel.com/static/editorjs-tools/alignblocks/src/assets/25387.png" &&
+            element.childNodes[i].width > 100
+          ) {
+            element.childNodes[i].width = element.childNodes[i].width * 0.9;
+          }
+        }
+      }
+    }
+  }
+
+  _increasePicturesSize(id_ligne) {
+    for (let elementFirst of document.getElementById(id_ligne).childNodes) {
+      for (let element of elementFirst.childNodes) {
+        for (let i = 0; i < element.childNodes.length; i++) {
+          if (
+            element.childNodes[i].tagName == "IMG" &&
+            element.childNodes[i].src !=
+              "https://slslt00254.sidom.sidel.com/static/editorjs-tools/alignblocks/src/assets/pictureButton.png" && // Il s'agit de la source de l'icone
+            element.childNodes[i].src !=
+              "https://slslt00254.sidom.sidel.com/static/editorjs-tools/alignblocks/src/assets/25390.png" &&
+            element.childNodes[i].src !=
+              "https://slslt00254.sidom.sidel.com/static/editorjs-tools/alignblocks/src/assets/25387.png"
+          ) {
+            element.childNodes[i].width = element.childNodes[i].width * 1.1;
+          }
+        }
+      }
+    }
   }
 
   _addBlock(id_ligne) {
@@ -265,14 +660,111 @@ class AlignBlocks {
       let bloc = document.createElement("div");
       bloc.id = `_bloc${idNext}_${id_ligne}`;
       bloc.style = "border: solid grey 0.10rem;";
-      bloc.classList.value = "ce-paragraph cdx-block";
+      bloc.classList.value = "ce-paragraph cdx-block container";
       bloc.contentEditable = "true";
       bloc.addEventListener("paste", (event) => {
         this._createImage(event, bloc.id);
       });
+
+      //sélecteur de fichier pour charger image
+      let selFile = document.createElement("input");
+      selFile.type = "file";
+      selFile.id = `_selFile_${bloc.id}`;
+      selFile.accept = "image/png, image/jpeg";
+      selFile.display = "none";
+      selFile.addEventListener("change", () => {
+        let fichier = selFile.files[0];
+        let name =
+          selFile.files[0].name != undefined
+            ? selFile.files[0].name
+            : "image.png";
+        let reader = new FileReader();
+        reader.addEventListener("load", function () {
+          let donnees = reader.result;
+          data = { image: donnees.split("base64,")[1], name: name };
+          ajaxPost(
+            "/documentation/cilt_edit/noticeEditorUploadImageByFile",
+            data,
+            (reponse) => {
+              rep = JSON.parse(reponse);
+              console.log(rep);
+              selFile.remove();
+              iconeInputFile.remove();
+              const image = document.createElement("img");
+              image.src = rep.file.url;
+              //Création d'un bouton superposé sur l'image qui permet d'augmenter la taille de l'image
+              let btnIncrease = document.createElement("img");
+              btnIncrease.classList.value = "btn";
+              btnIncrease.src =
+                "https://slslt00254.sidom.sidel.com/static/editorjs-tools/alignblocks/src/assets/25390.png";
+              //on cache le bouton par défaut
+              btnIncrease.hidden = true;
+              btnIncrease.addEventListener(
+                "click",
+                () => {
+                  image.width = image.width * 1.1;
+                },
+                false
+              );
+              //lorsque la souris est dessus le bloc, on affiche le bouton créé plus tôt ce qui nous permet de cliquer dessus afin d'augmenter sa taille
+              bloc.addEventListener("mouseover", () => {
+                btnIncrease.hidden = false;
+              });
+              //lorsque la souris n'est pas dessus le bloc, on masque le bouton et ses fonctionnalités
+              bloc.addEventListener("mouseout", () => {
+                btnIncrease.hidden = true;
+              });
+
+              //Idem que btnIncrease mais qui sert ici à réduire la taille de l'image
+              let btnReduce = document.createElement("img");
+              btnReduce.classList.value = "btn";
+              btnReduce.src =
+                "https://slslt00254.sidom.sidel.com/static/editorjs-tools/alignblocks/src/assets/25387.png";
+              btnReduce.style = "left: 35%;";
+              btnReduce.hidden = true;
+              btnReduce.addEventListener(
+                "click",
+                () => {
+                  image.width = image.width * 0.9;
+                },
+                false
+              );
+              bloc.addEventListener("mouseover", () => {
+                btnReduce.hidden = false;
+              });
+              bloc.addEventListener("mouseout", () => {
+                btnReduce.hidden = true;
+              });
+
+              bloc.appendChild(image);
+              bloc.appendChild(btnIncrease);
+              bloc.appendChild(btnReduce);
+            }
+          );
+        });
+        reader.readAsDataURL(fichier);
+      });
+      let iconeInputFile = document.createElement("img");
+      iconeInputFile.src =
+        "https://slslt00254.sidom.sidel.com/static/editorjs-tools/alignblocks/src/assets/pictureButton.png";
+      iconeInputFile.addEventListener("click", function () {
+        selFile.click();
+      });
+      iconeInputFile.id = `_icon_selFile_${bloc.id}`;
+      bloc.appendChild(iconeInputFile);
+
       col.appendChild(bloc);
       $(`#_bloc${idNext}_${id_ligne}`).attr("data-placeholder");
       document.getElementById(id_ligne).appendChild(col);
+    }
+  }
+  _deleteBlock(id_ligne) {
+    if (
+      document.getElementById(id_ligne).childNodes.length <= 4 &&
+      document.getElementById(id_ligne).childNodes.length > 1
+    ) {
+      let tailleLigne = document.getElementById(id_ligne).childNodes.length;
+      document.getElementById(id_ligne).childNodes[tailleLigne - 1].remove();
     }
   }
 
@@ -284,42 +776,67 @@ class AlignBlocks {
           "cdx-settings-button cdx-settings-button--active"
         ) {
           childElement.style.border = "";
+          for (let i = 1; i <= 4; i++) {
+            if (
+              document.getElementById(`_icon_selFile__bloc${i}_${id_ligne}`) !=
+              undefined
+            ) {
+              document.getElementById(
+                `_icon_selFile__bloc${i}_${id_ligne}`
+              ).hidden = true;
+            }
+          }
         } else {
           childElement.style.border = "0.1rem solid grey";
+          for (let i = 1; i <= 4; i++) {
+            if (
+              document.getElementById(`_icon_selFile__bloc${i}_${id_ligne}`) !=
+              undefined
+            ) {
+              document.getElementById(
+                `_icon_selFile__bloc${i}_${id_ligne}`
+              ).hidden = false;
+            }
+          }
         }
       }
     }
   }
 
   _toggleTune(tune) {
-    // this.data[tune] = !this.data[tune];
-    // this._acceptTuneView();
+    //Méthode loggant dans la console le nom de l'outil cliqué
     console.log("Vous avez cliqué sur : ", tune);
   }
-  _acceptTuneView() {
-    this.settings.forEach((tune) => {
-      this.wrapper.classList.toggle(tune.name, !!this.data[tune.name]);
-    });
+  _colAuto(id_ligne) {
+    const firstChild =
+      document.getElementById(id_ligne).childNodes[0].classList;
+    for (
+      let i = 0;
+      i < document.getElementById(id_ligne).childNodes.length;
+      i++
+    ) {
+      if (i == 0) {
+        if (
+          document.getElementById(id_ligne).childNodes[i].classList == "col"
+        ) {
+          document.getElementById(id_ligne).childNodes[i].classList =
+            "col-auto";
+        } else {
+          document.getElementById(id_ligne).childNodes[i].classList = "col";
+        }
+      } else if (i > 0) {
+        if (
+          document.getElementById(id_ligne).childNodes[0].classList == "col"
+        ) {
+          document.getElementById(id_ligne).childNodes[i].classList = "col";
+        } else {
+          document.getElementById(id_ligne).childNodes[i].classList =
+            "col-auto";
+        }
+      }
+    }
   }
-  uploadFile(file) {
-    this.uploader.uploadByFile(file, {
-      onPreview: (src) => {
-        this.ui.showPreloader(src);
-      },
-    });
-  }
-
-  /**
-   * Show preloader and upload image by target url
-   *
-   * @param {string} url - url pasted
-   * @returns {void}
-   */
-  uploadUrl(url) {
-    this.ui.showPreloader(url);
-    this.uploader.uploadByUrl(url);
-  }
-}
+} //On sort de la classe
 
 //fonction permettant de convertir une url en base64 pour permettre d'enregistrer l'image dans la bdd
 function toDataUrl(url, callback) {
